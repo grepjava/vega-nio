@@ -1,0 +1,4 @@
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	35278 1.490 2.331 2.914 4.972 0	[35278 ]
+swift	vapor	1	256	35317 7.099 8.033 9.215 11.766 0	[35317 ]
+swift	vapor	1	512	34989 14.192 15.336 16.614 21.577 0	[34989 ]

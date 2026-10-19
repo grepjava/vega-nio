@@ -133,7 +133,56 @@ group.runtime.logSlowPolls(to: Logger(label: "vega"), threshold: .milliseconds(1
 
 ## Benchmarks
 
-To be filled in.
+Hummingbird 2 and Vapor 4, each on SwiftNIO's NIOPosix and on VegaNIO. Each
+framework is one binary, built from [Examples/](Examples) as
+[the-benchmarker/web-frameworks](https://github.com/the-benchmarker/web-frameworks)
+builds its entries; `VEGANIO=1` makes it serve on VegaNIO. Everything above
+the event loop group is the same code in both.
+
+Run on 2026-10-19 on Vega 1.0.0: one i5-8250U (4 cores, 8 threads) with the
+clock capped at 2.4 GHz, so turbo can't favour whichever server runs first.
+Server and load share the 8 threads unpinned, as the suite runs them. The four
+servers took turns to go first over four rounds. Each figure is the median of
+the four rounds; no run had errors.
+
+**Ramp:** the suite's own load, `zrk -R1000:500000` for 15 s, an open-loop
+ramp to 500,000 requests a second. The figure is the rate achieved.
+
+| Requests/s | 64 connections | 256 connections | 512 connections |
+|---|---:|---:|---:|
+| Hummingbird on NIOPosix | 51,100 | 52,644 | 51,573 |
+| Hummingbird on VegaNIO | 49,479 (0.97×) | 52,868 (1.00×) | 51,880 (1.01×) |
+| Vapor on NIOPosix | 40,807 | 40,814 | 40,436 |
+| Vapor on VegaNIO | 40,400 (0.99×) | 40,758 (1.00×) | 40,323 (1.00×) |
+
+**Closed loop:** `oha -c N` for 15 s, which measures capacity.
+
+| Requests/s, p99 | 64 connections | 256 connections | 512 connections |
+|---|---:|---:|---:|
+| Hummingbird on NIOPosix | 46,174, 3.8 ms | 49,712, 11.8 ms | 49,153, 22.0 ms |
+| Hummingbird on VegaNIO | 43,982 (0.95×), 4.8 ms | 48,493 (0.98×), 17.5 ms | 48,406 (0.98×), 42.4 ms |
+| Vapor on NIOPosix | 35,450, 4.9 ms | 35,578, 15.0 ms | 35,342, 28.5 ms |
+| Vapor on VegaNIO | 35,180 (0.99×), 5.0 ms | 35,210 (0.99×), 11.7 ms | 34,921 (0.99×), 21.5 ms |
+
+- **VegaNIO runs these frameworks at NIOPosix's speed:** 0.97–1.01× under
+  the ramp and 0.95–0.99× closed loop. NIO's pipeline, its futures, its HTTP/1
+  codec and the framework above them cost more than the event loop
+  underneath, and VegaNIO keeps all of them.
+- **Tail latency moves both ways.** Under closed load at 256 and 512
+  connections, Hummingbird's p99 is higher on VegaNIO (17.5 against 11.8 ms,
+  42.4 against 22.0 ms), and Vapor's is lower (11.7 against 15.0 ms, 21.5
+  against 28.5 ms). Medians stay within 1.3 ms of each other, and
+  Hummingbird's are lower on VegaNIO (8.5 against 9.7 ms at 512).
+- **What VegaNIO buys is the runtime, not the speed:** a NIO app and native
+  Vega code on the same work-stealing workers, timers and blocking pool. On
+  Vega's own API the same contract ran at 2.4–2.6 times Hummingbird's rate
+  in an earlier, uncapped run on this box
+  ([Vega's benchmarks](https://github.com/grepjava/vega/blob/main/docs/BENCHMARKS.md)).
+
+The driver and every run's output are in
+[benchmarks/2026-10-19](benchmarks/2026-10-19); the load is
+[Garuda's `frameworks.sh`](https://github.com/grepjava/garuda/blob/main/benchmarks/frameworks.sh),
+which follows the suite's own command flag for flag.
 
 ## How it runs
 

@@ -106,14 +106,23 @@ The example's test uses Hummingbird's own live test framework (`app.test(.live)`
 
 ## Performance
 
-On the bench box, under the-benchmarker's load, Hummingbird on VegaNIO runs at parity with Hummingbird on NIOPosix: 0.95–1.00× the requests per second at 64–512 connections, with the same latency. Its router, NIO's pipeline and NIO's HTTP/1 codec cost more than the event loop does, so swapping the event loop alone doesn't make it faster.
+Hummingbird on VegaNIO runs at Hummingbird on NIOPosix's speed. On
+2026-10-19, on Vega 1.0.0, under the-benchmarker's load with the clock capped
+(median of four rounds, [README](../README.md#benchmarks)):
 
-Vega's own HTTP/1 server (`Benchmarks/Sources/vega-http`), with no NIO and no framework, served the same requests at 2.4–2.6× Hummingbird's rate on NIOPosix, at 512 connections.
+| Requests/s | 64 connections | 256 connections | 512 connections |
+|---|---:|---:|---:|
+| NIOPosix, ramp | 51,100 | 52,644 | 51,573 |
+| VegaNIO, ramp | 49,479 (0.97×) | 52,868 (1.00×) | 51,880 (1.01×) |
+| NIOPosix, closed loop | 46,174 | 49,712 | 49,153 |
+| VegaNIO, closed loop | 43,982 (0.95×) | 48,493 (0.98×) | 48,406 (0.98×) |
 
-| 512 connections, ramp | req/s |
-|---|---|
-| Hummingbird, NIOPosix | 65,495 / 65,487 |
-| Hummingbird, VegaNIO | 62,069 / 63,090 |
-| Native Vega (VegaHTTP1) | 158,388 / 169,734 |
+Its router, NIO's pipeline and NIO's HTTP/1 codec cost more than the event
+loop does, so swapping the event loop alone doesn't make it faster. Under
+closed load at 256 and 512 connections its p99 is higher on VegaNIO (17.5
+against 11.8 ms, 42.4 against 22.0 ms) and its median lower (8.5 against
+9.7 ms at 512).
 
-The setup, all three sweeps and the caveats are in [BENCHMARKS.md](BENCHMARKS.md#hummingbird-and-vapor-on-veganio-and-native-vegahttp1-2026-101314).
+In an earlier, uncapped run, Vega's own HTTP/1 server, with no NIO and no
+framework, served the same requests at 2.4–2.6× Hummingbird's rate on
+NIOPosix at 512 connections ([Vega's BENCHMARKS.md](https://github.com/grepjava/vega/blob/main/docs/BENCHMARKS.md#hummingbird-and-vapor-on-veganio-and-native-vegahttp1-2026-101314)).

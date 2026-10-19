@@ -94,14 +94,22 @@ The example's test starts a real Vapor server on a `VegaEventLoopGroup` (`app.se
 
 ## Performance
 
-On the bench box, under the-benchmarker's load, Vapor on VegaNIO runs at 0.94–0.96× the requests per second of Vapor on NIOPosix with the first VegaNIO, and at 0.97–0.99× once `flush` wrote inline as NIO's does. Vapor, NIO's pipeline and NIO's HTTP/1 codec cost more than the event loop does, so swapping the event loop alone doesn't make it faster.
+Vapor on VegaNIO runs at Vapor on NIOPosix's speed. On 2026-10-19, on Vega
+1.0.0, under the-benchmarker's load with the clock capped (median of four
+rounds, [README](../README.md#benchmarks)):
 
-Vega's own HTTP/1 server (`Benchmarks/Sources/vega-http`), with no NIO and no framework, served the same requests at about 3.3× Vapor's rate on NIOPosix, at 512 connections.
+| Requests/s | 64 connections | 256 connections | 512 connections |
+|---|---:|---:|---:|
+| NIOPosix, ramp | 40,807 | 40,814 | 40,436 |
+| VegaNIO, ramp | 40,400 (0.99×) | 40,758 (1.00×) | 40,323 (1.00×) |
+| NIOPosix, closed loop | 35,450 | 35,578 | 35,342 |
+| VegaNIO, closed loop | 35,180 (0.99×) | 35,210 (0.99×) | 34,921 (0.99×) |
 
-| 512 connections, ramp | req/s |
-|---|---|
-| Vapor, NIOPosix | 55,433 / 48,263 |
-| Vapor, VegaNIO | 47,267 / 46,779 |
-| Native Vega (VegaHTTP1) | 158,388 / 169,734 |
+Vapor, NIO's pipeline and NIO's HTTP/1 codec cost more than the event loop
+does, so swapping the event loop alone doesn't make it faster. Under closed
+load at 256 and 512 connections its p99 is lower on VegaNIO (11.7 against
+15.0 ms, 21.5 against 28.5 ms).
 
-The setup, all three sweeps and the caveats are in [BENCHMARKS.md](BENCHMARKS.md#hummingbird-and-vapor-on-veganio-and-native-vegahttp1-2026-101314).
+In an earlier, uncapped run, Vega's own HTTP/1 server, with no NIO and no
+framework, served the same requests at about 3.3× Vapor's rate on NIOPosix at
+512 connections ([Vega's BENCHMARKS.md](https://github.com/grepjava/vega/blob/main/docs/BENCHMARKS.md#hummingbird-and-vapor-on-veganio-and-native-vegahttp1-2026-101314)).

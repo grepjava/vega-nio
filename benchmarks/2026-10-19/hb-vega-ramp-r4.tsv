@@ -1,0 +1,4 @@
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	49597 3279.872 5806.080 7407.616 8392.704 0	[49597 ]
+swift	hummingbird	1	256	53227 3150.848 5650.432 7231.488 8189.952 0	[53227 ]
+swift	hummingbird	1	512	51771 3120.128 5568.512 7133.184 8185.856 0	[51771 ]

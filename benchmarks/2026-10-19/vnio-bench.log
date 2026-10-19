@@ -1,0 +1,163 @@
+clock 2400000 2026-10-19T10:53:37+08:00
+== round 1 hb-nio ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	51150 3169.280 5695.488 7288.832 8275.968 0	[51150 ]
+swift	hummingbird	1	256	52850 3146.752 5629.952 7211.008 8169.472 0	[52850 ]
+swift	hummingbird	1	512	51563 3116.032 5609.472 7211.008 8194.048 0	[51563 ]
+== round 1 hb-nio closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	46239 1.243 1.749 2.321 3.710 0	[46239 ]
+swift	hummingbird	1	256	49791 4.890 6.390 8.099 11.718 0	[49791 ]
+swift	hummingbird	1	512	49224 9.782 12.519 15.812 21.882 0	[49224 ]
+== round 1 hb-vega ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	49361 3308.544 5834.752 7432.192 8409.088 0	[49361 ]
+swift	hummingbird	1	256	52189 3142.656 5634.048 7219.200 8189.952 0	[52189 ]
+swift	hummingbird	1	512	51810 3105.792 5576.704 7137.280 8206.336 0	[51810 ]
+== round 1 hb-vega closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	43875 1.202 1.846 2.707 4.774 0	[43875 ]
+swift	hummingbird	1	256	48252 4.580 6.731 9.560 17.858 0	[48252 ]
+swift	hummingbird	1	512	48064 8.291 12.368 18.884 47.375 0	[48064 ]
+== round 1 vapor-nio ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	40875 3619.840 6281.216 7944.192 8966.144 0	[40875 ]
+swift	vapor	1	256	40889 3601.408 6268.928 7931.904 8949.760 0	[40889 ]
+swift	vapor	1	512	40527 3607.552 6268.928 7956.480 8998.912 0	[40527 ]
+== round 1 vapor-nio closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	35537 1.421 2.362 3.155 4.896 0	[35537 ]
+swift	vapor	1	256	35597 6.734 8.177 10.275 14.988 0	[35597 ]
+swift	vapor	1	512	35379 13.597 15.362 18.848 28.455 0	[35379 ]
+== round 1 vapor-vega ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	40737 3607.552 6260.736 7956.480 8974.336 0	[40737 ]
+swift	vapor	1	256	40885 3668.992 6281.216 7964.672 9031.680 0	[40885 ]
+swift	vapor	1	512	40372 3582.976 6248.448 7899.136 8966.144 0	[40372 ]
+== round 1 vapor-vega closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	35138 1.488 2.319 2.965 5.208 0	[35138 ]
+swift	vapor	1	256	35209 7.116 8.014 9.138 11.598 0	[35209 ]
+swift	vapor	1	512	34971 14.270 15.424 16.723 21.489 0	[34971 ]
+== round 2 hb-vega ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	49300 3286.016 5818.368 7419.904 8400.896 0	[49300 ]
+swift	hummingbird	1	256	53121 3148.800 5634.048 7215.104 8177.664 0	[53121 ]
+swift	hummingbird	1	512	52855 3099.648 5601.280 7157.760 8189.952 0	[52855 ]
+== round 2 hb-vega closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	44157 1.195 1.840 2.698 4.781 0	[44157 ]
+swift	hummingbird	1	256	48508 4.571 6.697 9.442 17.681 0	[48508 ]
+swift	hummingbird	1	512	48132 8.570 12.584 18.829 42.815 0	[48132 ]
+== round 2 vapor-nio ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	40763 3621.888 6273.024 7948.288 8966.144 0	[40763 ]
+swift	vapor	1	256	40965 3603.456 6260.736 7923.712 8966.144 0	[40965 ]
+swift	vapor	1	512	40610 3613.696 6252.544 7952.384 9031.680 0	[40610 ]
+== round 2 vapor-nio closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	35373 1.449 2.359 3.135 4.868 0	[35373 ]
+swift	vapor	1	256	35349 6.823 8.140 10.282 14.569 0	[35349 ]
+swift	vapor	1	512	35304 13.563 15.506 19.208 29.098 0	[35304 ]
+== round 2 vapor-vega ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	40233 3634.176 6301.696 7981.056 9007.104 0	[40233 ]
+swift	vapor	1	256	40427 3619.840 6285.312 7956.480 8982.528 0	[40427 ]
+swift	vapor	1	512	39908 3548.160 6195.200 7845.888 8974.336 0	[39908 ]
+== round 2 vapor-vega closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	35222 1.490 2.312 2.949 5.102 0	[35222 ]
+swift	vapor	1	256	35210 7.131 7.987 9.058 11.485 0	[35210 ]
+swift	vapor	1	512	34871 14.300 15.377 16.478 19.217 0	[34871 ]
+== round 2 hb-nio ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	50578 3247.104 5756.928 7354.368 8337.408 0	[50578 ]
+swift	hummingbird	1	256	52180 3152.896 5666.816 7251.968 8226.816 0	[52180 ]
+swift	hummingbird	1	512	51583 3150.848 5658.624 7235.584 8235.008 0	[51583 ]
+== round 2 hb-nio closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	46109 1.240 1.759 2.353 3.772 0	[46109 ]
+swift	hummingbird	1	256	49131 4.951 6.501 8.226 11.904 0	[49131 ]
+swift	hummingbird	1	512	49035 9.755 12.576 15.904 22.412 0	[49035 ]
+== round 3 vapor-nio ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	40526 3636.224 6293.504 7960.576 8982.528 0	[40526 ]
+swift	vapor	1	256	40554 3607.552 6277.120 7931.904 8966.144 0	[40554 ]
+swift	vapor	1	512	40346 3632.128 6301.696 7952.384 9007.104 0	[40346 ]
+== round 3 vapor-nio closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	35526 1.437 2.372 3.136 4.869 0	[35526 ]
+swift	vapor	1	256	35559 6.742 8.325 10.207 15.051 0	[35559 ]
+swift	vapor	1	512	35277 13.682 15.178 18.380 28.465 0	[35277 ]
+== round 3 vapor-vega ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	40567 3658.752 6322.176 7981.056 8998.912 0	[40567 ]
+swift	vapor	1	256	40707 3609.600 6260.736 7948.288 8998.912 0	[40707 ]
+swift	vapor	1	512	40274 3576.832 6199.296 7849.984 8957.952 0	[40274 ]
+== round 3 vapor-vega closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	35098 1.505 2.339 2.956 4.958 0	[35098 ]
+swift	vapor	1	256	35067 7.164 8.056 9.187 11.708 0	[35067 ]
+swift	vapor	1	512	34718 14.246 15.505 17.121 22.056 0	[34718 ]
+== round 3 hb-nio ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	51051 3200.000 5724.160 7321.600 8304.640 0	[51051 ]
+swift	hummingbird	1	256	52682 3152.896 5642.240 7223.296 8185.856 0	[52682 ]
+swift	hummingbird	1	512	51141 3118.080 5625.856 7231.488 8226.816 0	[51141 ]
+== round 3 hb-nio closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	46669 1.221 1.738 2.331 3.788 0	[46669 ]
+swift	hummingbird	1	256	50204 4.833 6.328 8.034 11.772 0	[50204 ]
+swift	hummingbird	1	512	50489 9.471 12.130 15.373 21.483 0	[50489 ]
+== round 3 hb-vega ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	49699 3312.640 5834.752 7432.192 8409.088 0	[49699 ]
+swift	hummingbird	1	256	52615 3144.704 5646.336 7219.200 8185.856 0	[52615 ]
+swift	hummingbird	1	512	51950 3083.264 5560.320 7120.896 8177.664 0	[51950 ]
+== round 3 hb-vega closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	44005 1.192 1.843 2.715 4.835 0	[44005 ]
+swift	hummingbird	1	256	48611 4.568 6.677 9.456 17.279 0	[48611 ]
+swift	hummingbird	1	512	48680 8.469 12.400 18.625 41.128 0	[48680 ]
+== round 4 vapor-vega ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	39608 3599.360 6244.352 7903.232 8982.528 0	[39608 ]
+swift	vapor	1	256	40808 3625.984 6264.832 7919.616 8974.336 0	[40808 ]
+swift	vapor	1	512	40428 3576.832 6219.776 7870.464 8949.760 0	[40428 ]
+== round 4 vapor-vega closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	35278 1.490 2.331 2.914 4.972 0	[35278 ]
+swift	vapor	1	256	35317 7.099 8.033 9.215 11.766 0	[35317 ]
+swift	vapor	1	512	34989 14.192 15.336 16.614 21.577 0	[34989 ]
+== round 4 hb-nio ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	51449 3212.288 5715.968 7305.216 8284.160 0	[51449 ]
+swift	hummingbird	1	256	52606 3093.504 5609.472 7174.144 8153.088 0	[52606 ]
+swift	hummingbird	1	512	52634 3087.360 5580.800 7145.472 8165.376 0	[52634 ]
+== round 4 hb-nio closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	46099 1.240 1.757 2.348 3.801 0	[46099 ]
+swift	hummingbird	1	256	49634 4.898 6.412 8.157 11.870 0	[49634 ]
+swift	hummingbird	1	512	49082 9.729 12.525 15.848 22.157 0	[49082 ]
+== round 4 hb-vega ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	49597 3279.872 5806.080 7407.616 8392.704 0	[49597 ]
+swift	hummingbird	1	256	53227 3150.848 5650.432 7231.488 8189.952 0	[53227 ]
+swift	hummingbird	1	512	51771 3120.128 5568.512 7133.184 8185.856 0	[51771 ]
+== round 4 hb-vega closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	hummingbird	1	64	43959 1.199 1.849 2.709 4.798 0	[43959 ]
+swift	hummingbird	1	256	48478 4.586 6.693 9.477 17.329 0	[48478 ]
+swift	hummingbird	1	512	48757 8.505 12.389 18.654 41.900 0	[48757 ]
+== round 4 vapor-nio ramp
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	40851 3623.936 6281.216 7952.384 8966.144 0	[40851 ]
+swift	vapor	1	256	40739 3597.312 6260.736 7940.096 8957.952 0	[40739 ]
+swift	vapor	1	512	35242 3550.208 6191.104 8005.632 9187.328 0	[35242 ]
+== round 4 vapor-nio closed
+framework	server	workers	connections	req/s p50_ms p75_ms p90_ms p99_ms errors	runs
+swift	vapor	1	64	33427 1.584 2.413 3.460 5.515 0	[33427 ]
+swift	vapor	1	256	35655 6.660 8.326 10.282 15.247 0	[35655 ]
+swift	vapor	1	512	35383 13.677 15.210 18.323 28.056 0	[35383 ]
+done 2026-10-19T11:22:37+08:00
+clock restored 3400000
