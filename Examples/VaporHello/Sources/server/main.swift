@@ -7,8 +7,7 @@ import VegaNIO
 var env = Environment(name: Environment.get("VAPOR_ENV") ?? "development")
 try LoggingSystem.bootstrap(from: &env)
 let vega = Environment.get("VEGANIO") == "1"
-let app = vega ? Application(env, .shared(VegaEventLoopGroup())) : Application(env)
-defer { app.shutdown() }
+let app = try await vega ? Application.make(env, .shared(VegaEventLoopGroup())) : Application.make(env)
 app.middleware = .init()
 if vega { app.http.server.configuration.useVega() }
 
@@ -37,4 +36,10 @@ if let portString = Environment.get("SERVER_PORT"), let port = Int(portString) {
     app.http.server.configuration.port = 3000
 }
 
-try app.run()
+do {
+    try await app.execute()
+} catch {
+    try? await app.asyncShutdown()
+    throw error
+}
+try await app.asyncShutdown()

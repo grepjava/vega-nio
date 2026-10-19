@@ -15,9 +15,9 @@ That needs one small change in Hummingbird, described below. A working example i
 
 ## The patch
 
-[`Examples/hummingbird-make-bootstrap.patch`](../Examples/hummingbird-make-bootstrap.patch) is made against Hummingbird `13c924d` (main, October 2026). It touches 3 files, adding 50 lines and removing 26. It doesn't mention Vega, so the same hook would work for any other transport:
+[`Examples/hummingbird-make-bootstrap.patch`](../Examples/hummingbird-make-bootstrap.patch) is made against Hummingbird `13c924d` (main, October 2026). It touches 3 files, adding 51 lines and removing 27. It doesn't mention Vega, so the same hook would work for any other transport:
 
-- `ServerBootstrapProtocol` becomes `public`.
+- `ServerBootstrapProtocol` becomes `public`, and so does `Server.swift`'s import of NIOTransportServices, whose listener bootstrap conforms to it on Apple platforms.
 - `ServerConfiguration` and `ApplicationConfiguration` gain `makeBootstrap: (@Sendable (any EventLoopGroup) -> (any ServerBootstrapProtocol)?)?`.
   - The default is `nil`.
   - `ApplicationConfiguration.with(...)` carries it over.
@@ -45,11 +45,12 @@ extension ApplicationConfiguration {
     /// Serve with VegaNIO when the group is a VegaEventLoopGroup, with the
     /// options Hummingbird's own sockets bootstrap sets.
     public mutating func useVega() {
-        let backlog = Int32(self.backlog), reuseAddress = self.reuseAddress
+        let backlog = Int32(self.backlog)
+        let reuseAddress: SocketOptionValue = self.reuseAddress ? 1 : 0
         makeBootstrap = { group in
             VegaServerBootstrap(validatingGroup: group)?
                 .serverChannelOption(.backlog, value: backlog)
-                .serverChannelOption(.socketOption(.so_reuseaddr), value: reuseAddress ? 1 : 0)
+                .serverChannelOption(.socketOption(.so_reuseaddr), value: reuseAddress)
                 .childChannelOption(.allowRemoteHalfClosure, value: true)
         }
     }

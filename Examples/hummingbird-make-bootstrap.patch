@@ -67,9 +67,18 @@ index abae7c2..f6750de 100644
      #endif
  }
 diff --git a/Sources/HummingbirdCore/Server/Server.swift b/Sources/HummingbirdCore/Server/Server.swift
-index ecabbf9..79e48b2 100644
+index ecabbf9..eddd86d 100644
 --- a/Sources/HummingbirdCore/Server/Server.swift
 +++ b/Sources/HummingbirdCore/Server/Server.swift
+@@ -14,7 +14,7 @@ public import ServiceLifecycle
+ 
+ #if canImport(Network)
+ import Network
+-import NIOTransportServices
++public import NIOTransportServices
+ #endif
+ 
+ /// HTTP server class
 @@ -195,27 +195,11 @@ public actor Server<ChildChannel: ServerChildChannel>: Service {
          configuration: ServerConfiguration
      ) async throws -> (AsyncServerChannel, ServerQuiescingHelper) {

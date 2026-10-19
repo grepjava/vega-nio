@@ -13,11 +13,12 @@ extension ApplicationConfiguration {
     /// `VegaEventLoopGroup`, with the options Hummingbird's own
     /// sockets bootstrap sets.
     public mutating func useVega() {
-        let backlog = Int32(self.backlog), reuseAddress = self.reuseAddress
+        let backlog = Int32(self.backlog)
+        let reuseAddress: SocketOptionValue = self.reuseAddress ? 1 : 0
         makeBootstrap = { group in
             VegaServerBootstrap(validatingGroup: group)?
                 .serverChannelOption(.backlog, value: backlog)
-                .serverChannelOption(.socketOption(.so_reuseaddr), value: reuseAddress ? 1 : 0)
+                .serverChannelOption(.socketOption(.so_reuseaddr), value: reuseAddress)
                 .childChannelOption(.allowRemoteHalfClosure, value: true)
         }
     }
