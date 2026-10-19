@@ -3,16 +3,10 @@ import HummingbirdCore
 import NIOCore
 import VegaNIO
 
-extension VegaServerBootstrap: @retroactive ServerBootstrapProtocol {
-    public func bind<Output: Sendable>(
-        unixDomainSocketPath: String,
-        cleanupExistingSocketFile: Bool,
-        serverBackPressureStrategy: NIOAsyncSequenceProducerBackPressureStrategies.HighLowWatermark?,
-        childChannelInitializer: @escaping @Sendable (any Channel) -> EventLoopFuture<Output>
-    ) async throws -> NIOAsyncChannel<Output, Never> {
-        throw ChannelError.operationUnsupported
-    }
-}
+// VegaServerBootstrap's own bind(host:port:...) and
+// bind(unixDomainSocketPath:cleanupExistingSocketFile:...) are the ones
+// Hummingbird calls.
+extension VegaServerBootstrap: @retroactive ServerBootstrapProtocol {}
 
 extension ApplicationConfiguration {
     /// Serve with VegaNIO when the application's group is a

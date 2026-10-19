@@ -1,8 +1,83 @@
 # VegaNIO
 
-SwiftNIO's `EventLoopGroup`, `EventLoop`, `Channel` and bootstraps, running on Vega. NIO handlers, `ChannelPipeline`, `EventLoopFuture` and `NIOAsyncChannel` work as they do on NIO, while Vega does the scheduling and the I/O.
+SwiftNIO's `EventLoopGroup`, `EventLoop`, `Channel` and bootstraps, running on
+[Vega](https://github.com/grepjava/vega). Hummingbird, Vapor and other code
+written for SwiftNIO keeps its handlers, `ChannelPipeline`, `EventLoopFuture`s
+and `NIOAsyncChannel`s, while Vega does the scheduling and the I/O underneath.
 
-VegaNIO is its own package, so that Vega keeps no dependencies. It depends on Vega and on swift-nio's `NIOCore`.
+This package also bridges Vega to Apple's other server packages:
+`VegaSwiftMetrics` reports Vega's runtime metrics through swift-metrics, and
+`VegaLogging` logs slow task polls through swift-log.
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/grepjava/vega-nio.git", from: "1.0.0"),
+],
+targets: [
+    .target(name: "App", dependencies: [
+        .product(name: "VegaNIO", package: "vega-nio"),
+        .product(name: "VegaSwiftMetrics", package: "vega-nio"),   // optional
+        .product(name: "VegaLogging", package: "vega-nio"),        // optional
+    ]),
+]
+```
+
+## What VegaNIO is
+
+SwiftNIO's own event loops (`MultiThreadedEventLoopGroup`, from NIOPosix) are
+threads: each runs its channels and nothing else, and a channel stays on the
+thread it was given. That keeps NIO simple and fast, but a busy loop can't
+hand work to an idle one, and the work you do outside NIO (Swift tasks,
+blocking calls, timers) runs on other threads and pools that NIO knows
+nothing about.
+
+VegaNIO puts NIO's API on top of Vega, a runtime for Swift built the way
+[Tokio](https://tokio.rs) is built for Rust. A NIO app gets Vega's runtime
+underneath without rewriting its handlers:
+
+- **A work-stealing scheduler.** Each worker thread has a local queue of 256
+  jobs and a LIFO slot, so a task woken by the one running now runs next, on
+  a warm core. An idle worker steals half of a busy worker's queue. Work from
+  outside the workers goes through a shared inject queue, which every worker
+  checks regularly so it is never starved. This is Tokio's multi-threaded
+  scheduler, run as a Swift `TaskExecutor`.
+- **A cooperative budget.** Swift can't preempt a task, so each poll gets a
+  budget of 128 operations (Tokio's figure). A task that uses it up yields at
+  its next Vega call, so one busy connection can't hold a worker.
+- **The I/O driver of each platform.** io_uring on Linux 6.7 and later, with
+  a ring per worker; epoll on older Linux; kqueue on macOS; IOCP on Windows.
+  Workers sleep in the driver, so waking on I/O costs no extra thread hop.
+- **A hierarchical timer wheel,** sharded per worker, for every deadline:
+  NIO's `scheduleTask`, timeouts and sleeps.
+- **A blocking pool** for work that would stall a worker: Tokio's
+  `spawn_blocking` as `Runtime.blocking { }`, with `Runtime.tryBlocking` to
+  refuse work when the pool's queue is full, and `Runtime.blockInPlace`.
+- **Tokio's toolbox** for the async code beside your handlers: `JoinSet`,
+  `MPSCChannel`, `Oneshot`, `Broadcast`, `Watch`, `Notify`, `Semaphore`,
+  `AsyncMutex`, `Barrier`, `Interval`, and `Runtime.timeout(for:)`.
+- **Runtime metrics:** per-worker counters, steals, queue depths and poll
+  times, with `Runtime.onSlowPoll` to catch a handler that blocks.
+
+How NIO's model maps onto it:
+
+- **A loop is a serial queue, not a thread.** Handlers on one loop run one at
+  a time and in order, as NIO promises, and `inEventLoop`,
+  `preconditionInEventLoop` and `assumeIsolated` hold while they run. But any
+  of Vega's workers can run a loop's work, so a loop with work never waits
+  behind a busy thread.
+- **Each connection's reads and writes are Vega tasks,** which idle workers
+  can steal.
+- **One runtime for everything.** `group.runtime` is a Vega `Runtime`: spawn
+  tasks on it, run blocking work in its pool, or use Vega's own sockets and
+  protocols beside your NIO channels, all on the same worker threads.
+
+VegaNIO swaps the engine under NIO, not NIO itself: the pipeline, the futures,
+NIO's HTTP codec and the framework above them all stay. So an app runs at
+about the same speed as on NIOPosix (see [Benchmarks](#benchmarks)). For
+Vega's full speed, write against Vega's own API, or use
+[Garuda](https://github.com/grepjava/garuda), the web framework built on it.
+
+## Using it
 
 ```swift
 import NIOCore
@@ -19,6 +94,10 @@ let server = try await VegaServerBootstrap(group: group)
     .bind(host: "0.0.0.0", port: 8080).get()
 ```
 
+`VegaEventLoopGroup(loops:)` starts a runtime of its own with a worker per
+loop (the CPU count by default). `VegaEventLoopGroup(runtime:loops:)` runs the
+loops on a runtime you already have.
+
 | NIOPosix | VegaNIO |
 |---|---|
 | `MultiThreadedEventLoopGroup` | `VegaEventLoopGroup(loops:)`, or `VegaEventLoopGroup(runtime:loops:)` on a runtime you already have |
@@ -26,6 +105,35 @@ let server = try await VegaServerBootstrap(group: group)
 | `ClientBootstrap` | `VegaClientBootstrap`, which is an `NIOClientTCPBootstrapProtocol`; `connect(host:port:)` races the host's addresses (Happy Eyeballs); `connect(unixDomainSocketPath:)` |
 | `DatagramBootstrap` | `VegaDatagramBootstrap`: UDP channels of `AddressedEnvelope<ByteBuffer>`, bound (`bind(host:port:)`, `bind(to:)`) or connected (`connect(host:port:)`, `connect(to:)`, which also take plain `ByteBuffer` writes), with the async forms that wrap the channel in an `NIOAsyncChannel` before it goes active. Unix datagram sockets too, over Vega's `UnixDatagram`: `bind(unixDomainSocketPath:cleanupExistingSocketFile:)` and `connect(unixDomainSocketPath:)`, with envelopes addressed by `.unixDomainSocket` (Linux and macOS) |
 | `NIOPipeBootstrap` | `VegaPipeBootstrap`: `takingOwnershipOfDescriptors(input:output:)`, `takingOwnershipOfDescriptor(input:)`, `(output:)` and `(inputOutput:)`, and their async forms. Regular files are refused, as on NIO. Linux and macOS |
+
+### Hummingbird 2 and Vapor 4
+
+Both run on VegaNIO. Each builds NIOPosix's `ServerBootstrap` itself, so each
+needs a small patch that lets it take another bootstrap, as both already do
+for NIOTransportServices. [docs/HUMMINGBIRD2.md](docs/HUMMINGBIRD2.md) and
+[docs/VAPOR.md](docs/VAPOR.md) have the patches and how to use them, and
+[Examples/](Examples) has a working app for each.
+
+## Metrics and logging
+
+```swift
+import Logging
+import Vega
+import VegaSwiftMetrics
+import VegaLogging
+
+// Every 10 s, Runtime.metrics as swift-metrics counters and gauges, with
+// whatever backend the process bootstrapped (Prometheus, StatsD, ...).
+group.runtime.reportMetrics(every: .seconds(10), prefix: "vega")
+
+// Each task poll that ran longer than 10 ms, logged through swift-log:
+// a handler that blocks a worker shows up here.
+group.runtime.logSlowPolls(to: Logger(label: "vega"), threshold: .milliseconds(10))
+```
+
+## Benchmarks
+
+To be filled in.
 
 ## How it runs
 
@@ -42,7 +150,7 @@ let server = try await VegaServerBootstrap(group: group)
 - Multicast (`MulticastChannel`), and UDP's vector reads, GSO, GRO and ECN options are not supported yet: each read takes one datagram, and `datagramVectorReadMessageCount` is accepted and ignored.
 - `close(mode: .input)` works on pipe channels, not yet on sockets.
 - Writing a `FileRegion` fails with `ChannelError.operationUnsupported`.
-- Libraries that build `NIOPosix.ServerBootstrap` or `ClientBootstrap` themselves need a way to accept a different bootstrap, as they already do for NIOTransportServices. Hummingbird 2 and Vapor 4 each need a small patch for this; see [HUMMINGBIRD2.md](../docs/HUMMINGBIRD2.md) and [VAPOR.md](../docs/VAPOR.md), with working examples in `Examples/`.
+- Libraries that build `NIOPosix.ServerBootstrap` or `ClientBootstrap` themselves need a way to accept a different bootstrap, as they already do for NIOTransportServices. Hummingbird 2 and Vapor 4 each need a small patch for this; see above.
 - Linux and macOS. NIO's Windows support is partial, so Windows is not covered yet. The port
   is mostly mechanical: about 30 errors in five files, from POSIX calls (`stat`, `errno`,
   `setsockopt`, `close`, `socklen_t`, the `E*` constants) that want their Winsock and ucrt
@@ -52,8 +160,15 @@ let server = try await VegaServerBootstrap(group: group)
 ## Testing
 
 ```sh
-cd VegaNIO
 swift test
 ```
 
-The suite covers event-loop ordering and serial execution, scheduled and repeated tasks, actors on a loop's executor, echo, connection refused, write-then-close, half-closure, writability and water marks, socket options, NIO's own HTTP/1 handlers, `NIOAsyncChannel` on both ends, and group shutdown; UDP echo, addressed and connected, `SO_REUSEADDR` and the async datagram bind; Unix datagram echo by path, an unbound connected sender, socket-file cleanup and the async forms; a Unix socket echo server and client, with socket-file cleanup; and pipe channels over pipe(2) and a socketpair, one way and both ways, closing input or output alone, and the refusal of regular files. It is clean under ThreadSanitizer.
+Clone the repository as `vega-nio` (its default name): the examples refer to
+this package by that name. `VEGA_PATH=/path/to/vega swift test` builds against
+a local Vega checkout instead of the release.
+
+VegaNIO's suite covers event-loop ordering and serial execution, scheduled and repeated tasks, actors on a loop's executor, echo, connection refused, write-then-close, half-closure, writability and water marks, socket options, NIO's own HTTP/1 handlers, `NIOAsyncChannel` on both ends, and group shutdown; UDP echo, addressed and connected, `SO_REUSEADDR` and the async datagram bind; Unix datagram echo by path, an unbound connected sender, socket-file cleanup and the async forms; a Unix socket echo server and client, with socket-file cleanup; and pipe channels over pipe(2) and a socketpair, one way and both ways, closing input or output alone, and the refusal of regular files. It is clean under ThreadSanitizer. The adapters' tests check the metrics recorded and the slow polls logged.
+
+## License
+
+MIT; see [LICENSE](LICENSE).

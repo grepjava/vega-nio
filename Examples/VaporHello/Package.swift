@@ -15,7 +15,7 @@ let package = Package(
         .target(
             name: "VaporVega",
             dependencies: [
-                .product(name: "VegaNIO", package: "veganio"),
+                .product(name: "VegaNIO", package: "vega-nio"),
                 .product(name: "Vapor", package: "vapor"),
             ]
         ),
@@ -23,7 +23,7 @@ let package = Package(
             name: "VaporHello",
             dependencies: [
                 "VaporVega",
-                .product(name: "VegaNIO", package: "veganio"),
+                .product(name: "VegaNIO", package: "vega-nio"),
                 .product(name: "Vapor", package: "vapor"),
             ]
         ),
@@ -32,7 +32,7 @@ let package = Package(
             name: "server",
             dependencies: [
                 "VaporVega",
-                .product(name: "VegaNIO", package: "veganio"),
+                .product(name: "VegaNIO", package: "vega-nio"),
                 .product(name: "Vapor", package: "vapor"),
             ]
         ),
@@ -40,7 +40,7 @@ let package = Package(
             name: "VaporHelloTests",
             dependencies: [
                 "VaporVega",
-                .product(name: "VegaNIO", package: "veganio"),
+                .product(name: "VegaNIO", package: "vega-nio"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
             ]

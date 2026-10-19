@@ -14,7 +14,7 @@ let package = Package(
         .target(
             name: "HummingbirdVega",
             dependencies: [
-                .product(name: "VegaNIO", package: "veganio"),
+                .product(name: "VegaNIO", package: "vega-nio"),
                 .product(name: "Hummingbird", package: "hummingbird"),
             ],
             path: "Sources/HummingbirdVega"
@@ -23,7 +23,7 @@ let package = Package(
             name: "HummingbirdHello",
             dependencies: [
                 "HummingbirdVega",
-                .product(name: "VegaNIO", package: "veganio"),
+                .product(name: "VegaNIO", package: "vega-nio"),
                 .product(name: "Hummingbird", package: "hummingbird"),
             ]
         ),
@@ -32,7 +32,7 @@ let package = Package(
             name: "server",
             dependencies: [
                 "HummingbirdVega",
-                .product(name: "VegaNIO", package: "veganio"),
+                .product(name: "VegaNIO", package: "vega-nio"),
                 .product(name: "Hummingbird", package: "hummingbird"),
             ]
         ),
@@ -40,7 +40,7 @@ let package = Package(
             name: "HummingbirdHelloTests",
             dependencies: [
                 "HummingbirdVega",
-                .product(name: "VegaNIO", package: "veganio"),
+                .product(name: "VegaNIO", package: "vega-nio"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
             ]
