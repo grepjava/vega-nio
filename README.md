@@ -11,7 +11,7 @@ This package also bridges Vega to Apple's other server packages:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/grepjava/vega-nio.git", from: "1.0.0"),
+    .package(url: "https://github.com/grepjava/vega-nio.git", from: "1.1.0"),
 ],
 targets: [
     .target(name: "App", dependencies: [
@@ -179,6 +179,21 @@ ramp to 500,000 requests a second. The figure is the rate achieved.
   in an earlier, uncapped run on this box
   ([Vega's benchmarks](https://github.com/grepjava/vega/blob/main/docs/BENCHMARKS.md)).
 
+**Idle connections.** 20,000 keep-alive connections to Hummingbird, each
+having made one request, then left open; the server's memory per connection,
+on Linux (2026-10-21):
+
+| Per idle connection | |
+|---|---:|
+| Hummingbird on NIOPosix | 17.2 KiB |
+| Hummingbird on VegaNIO 1.0 | 27.1 KiB |
+| Hummingbird on VegaNIO 1.1 | 19.7 KiB |
+
+1.1 waits for input holding no read buffer, and starts a connection's writer
+task only when a flush leaves bytes behind. Its throughput on the closed loop
+above, pinned, is 0.99× 1.0's (within 1.2% at 64, 256 and 512 connections,
+with the same p99).
+
 The driver and every run's output are in
 [benchmarks/2026-10-19](benchmarks/2026-10-19); the load is
 [Garuda's `frameworks.sh`](https://github.com/grepjava/garuda/blob/main/benchmarks/frameworks.sh),
@@ -188,7 +203,7 @@ which follows the suite's own command flag for flag.
 
 - **A loop is a serial queue, not a thread.** Handlers on one loop run one at a time and in order, as NIO promises, and `inEventLoop`, `preconditionInEventLoop` and `assumeIsolated` hold while they run. Whichever Vega worker picks up a loop's work runs it, so a loop doesn't stay on one thread from one tick to the next. NIOTransportServices' loops on Dispatch behave the same way. A group can have more loops than the runtime has workers.
 - **Swift tasks isolated to a loop** (an actor whose `unownedExecutor` is `eventLoop.executor`) run on the loop, inline.
-- **Each connection has a reader task and a writer task.** These are ordinary Vega tasks that any worker can steal. The reader reads when the pipeline asks for a read (`autoRead` asks after every delivery) and hands the bytes to the loop. When nobody else is running the loop, the reader delivers on its own task, so a quiet connection costs no hop. `flush()` sends what the socket takes there and then, as NIO's does (Vega's `tryWrite`, which never waits), and completes those write promises at once. Only what doesn't fit goes to the writer, which sends it when the socket has room and then reports back. While the writer is busy, later flushes queue behind it, so bytes always go out in order.
+- **Each connection has a reader task, and a writer task while it has output waiting.** These are ordinary Vega tasks that any worker can steal. The reader reads when the pipeline asks for a read (`autoRead` asks after every delivery) and hands the bytes to the loop. It waits in Vega's `receive()`, which holds no buffer: the runtime lends one when bytes arrive, and takes it back once they are copied into the channel's `ByteBuffer`. When nobody else is running the loop, the reader delivers on its own task, so a quiet connection costs no hop. `flush()` sends what the socket takes there and then, as NIO's does (Vega's `tryWrite`, which never waits), and completes those write promises at once. Only what doesn't fit goes to a writer task, started for it, which sends it when the socket has room, reports back, and ends once nothing is left. While it is busy, later flushes queue behind it, so bytes always go out in order.
 - **Unix sockets and pipes** run the same way, over Vega's `UnixStream` and its `PipeReader` and `PipeWriter`. A pipe has no write that never waits, so its `flush()` hands everything to the writer, and write promises complete once the writer has sent them. A pipe channel can close its input or its output on its own, and closes once neither is left.
 - **A UDP channel** has a reader task that receives one datagram (up to 64 KiB, so none is cut short) whenever the pipeline asks for a read, and a writer task that sends flushed datagrams in order, completing each write's promise once its datagram has gone. A datagram the network refuses fails its own write, or comes up as an `errorCaught` while reading, and doesn't close the channel. `SO_REUSEADDR` and `SO_REUSEPORT` set as channel options apply before the socket binds. A Unix datagram channel runs the same way; one made by `connect(unixDomainSocketPath:)` is unbound, as on NIO, so its peer sees an empty path as the sender and has nowhere to answer.
 - **Closing a channel** stops reading at once and fails writes that were never flushed. Flushed writes still go out, so write-then-close works as it does on NIO, but only for up to 10 seconds if the peer isn't taking them.

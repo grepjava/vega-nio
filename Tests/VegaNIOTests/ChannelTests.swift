@@ -124,6 +124,33 @@ private final class Collector: ChannelInboundHandler, @unchecked Sendable {
         try server.close().wait()
     }
 
+    /// Bursts larger than the socket takes at once, with pauses between:
+    /// the writer task starts for each, ends once it has sent it, and starts
+    /// again for the next, on both ends of an echo.
+    @Test func writerComesAndGoes() throws {
+        let group = VegaEventLoopGroup(loops: 2)
+        defer { try? group.syncShutdownGracefully() }
+        let server = try VegaServerBootstrap(group: group)
+            .childChannelInitializer { $0.pipeline.addHandler(EchoHandler()) }
+            .bind(host: "127.0.0.1", port: 0).wait()
+        let port = try #require(server.localAddress?.port)
+        let bursts = 5, size = 512 << 10
+        let payload = ByteBuffer(bytes: (0..<bursts * size).map { UInt8(truncatingIfNeeded: $0 &* 13) })
+        let done = group.next().makePromise(of: ByteBuffer.self)
+        let collector = Collector(expected: payload.readableBytes, done: done)
+        let client = try VegaClientBootstrap(group: group)
+            .channelInitializer { $0.pipeline.addHandler(collector) }
+            .connect(host: "127.0.0.1", port: port).wait()
+        var rest = payload
+        for _ in 0..<bursts {
+            try client.writeAndFlush(rest.readSlice(length: size)!).wait()
+            try client.eventLoop.scheduleTask(in: .milliseconds(50)) {}.futureResult.wait()
+        }
+        #expect(try done.futureResult.wait() == payload)
+        try client.close().wait()
+        try server.close().wait()
+    }
+
     /// With remote half-closure allowed, end of stream is an event and the
     /// channel can still send.
     @Test func halfClosure() throws {

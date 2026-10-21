@@ -9,7 +9,7 @@ import PackageDescription
 /// on both before a Vega release has what this package needs.
 let vega: Package.Dependency = Context.environment["VEGA_PATH"].map {
     .package(path: $0)
-} ?? .package(url: "https://github.com/grepjava/vega.git", from: "1.0.0")
+} ?? .package(url: "https://github.com/grepjava/vega.git", from: "1.1.0")
 
 let swiftSettings: [SwiftSetting] = [.swiftLanguageMode(.v6)]
 

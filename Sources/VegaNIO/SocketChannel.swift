@@ -5,6 +5,7 @@ import class Vega.Runtime
 import struct Vega.TCPStream
 import struct Vega.UnixStream
 import struct Vega.IOBuffer
+import struct Vega.ReceivedBytes
 import struct Vega.StreamHalves
 import struct Vega.ReadHalf
 import struct Vega.WriteHalf
@@ -580,7 +581,9 @@ final class StreamBox: @unchecked Sendable {
 
 /// What a stream channel reads: a socket's read half, or a pipe.
 protocol ByteSource: ~Copyable, Sendable {
-    func read(into buffer: inout IOBuffer) async throws(VegaIOError) -> Int
+    /// Wait for bytes, in storage lent by the runtime: empty at the end of
+    /// the stream. A socket holds no buffer while it waits here.
+    func receive() async throws(VegaIOError) -> ReceivedBytes
 }
 
 /// What a stream channel writes: a socket's write half, or a pipe.
@@ -593,7 +596,14 @@ protocol ByteSink: ~Copyable, Sendable {
 
 extension ReadHalf: ByteSource {}
 extension WriteHalf: ByteSink {}
-extension PipeReader: ByteSource {}
+
+extension PipeReader: ByteSource {
+    func receive() async throws(VegaIOError) -> ReceivedBytes {
+        var buffer = IOBuffer(capacity: ReceivedBytes.blockSize)
+        _ = try await read(into: &buffer)
+        return ReceivedBytes(buffer)
+    }
+}
 
 extension PipeWriter: ByteSink {
     func write(vectored parts: UnsafeBufferPointer<UnsafeRawBufferPointer>) async throws(VegaIOError) {
@@ -670,7 +680,9 @@ final class StreamIO<Source: ByteSource & ~Copyable, Sink: ByteSink & ~Copyable>
         /// The write half is in use: by the writer, or by a flush.
         var writing = false
         var shutdownOutput = false
-        var writer: UnsafeContinuation<Void, Never>?
+        /// A writer task is running. One starts when there is something for
+        /// it, and ends once there isn't: an idle connection has none.
+        var writerRunning = false
         var closed = false
         /// The input alone is closed (a pipe's): the reader stops.
         var inputShut = false
@@ -678,9 +690,12 @@ final class StreamIO<Source: ByteSource & ~Copyable, Sink: ByteSink & ~Copyable>
         /// The writer has something to do and the half is free.
         var writerReady: Bool { !writing && (closed || shutdownOutput || !writes.isEmpty) }
 
-        mutating func takeWriter() -> UnsafeContinuation<Void, Never>? {
-            defer { writer = nil }
-            return writer
+        /// Whether to start a writer for what is ready now: true at most
+        /// once until that writer ends.
+        mutating func claimWriter() -> Bool {
+            guard !writerRunning, writerReady else { return false }
+            writerRunning = true
+            return true
         }
     }
 
@@ -688,6 +703,7 @@ final class StreamIO<Source: ByteSource & ~Copyable, Sink: ByteSink & ~Copyable>
     private let readerTask = NIOLockedValueBox<Task<Void, Never>?>(nil)
     private let writerTask = NIOLockedValueBox<Task<Void, Never>?>(nil)
     private let out: WriterBox<Sink>
+    private let hasOutput: Bool
     private let loop: VegaEventLoop
     /// The channel owns this; a back reference that costs no count.
     private unowned(unsafe) let channel: VegaSocketChannel
@@ -695,46 +711,59 @@ final class StreamIO<Source: ByteSource & ~Copyable, Sink: ByteSink & ~Copyable>
     init(reader input: consuming Source?, writer output: consuming Sink?, channel: VegaSocketChannel) {
         loop = channel.loop
         self.channel = channel
-        let hasOutput = output != nil
+        hasOutput = output != nil
         out = WriterBox(output)
         if let input = input.take() { startReader(input, channel: channel) }
-        if hasOutput { startWriter(channel: channel) }
+    }
+
+    /// Under `shared`'s lock: claim a writer for what is ready, if this
+    /// channel writes and none is running. Start it once the lock is let go.
+    private func claimWriter(_ s: inout Shared) -> Bool {
+        hasOutput && s.claimWriter()
     }
 
     private func startReader(_ input: consuming Source, channel: VegaSocketChannel) {
         let loop = self.loop
         let reader = loop.runtime.spawn(with: input) { [self] half in
-            var buffer = IOBuffer(capacity: 64 * 1024)
+            // receive() holds no buffer while the channel waits: the
+            // runtime lends storage when bytes arrive, and it goes back as
+            // soon as they are copied into the channel's ByteBuffer.
             while await waitToRead() {
-                buffer.clear()
-                let n: Int
+                let received: ReceivedBytes
                 do throws(VegaIOError) {
-                    n = try await half.read(into: &buffer)
+                    received = try await half.receive()
                 } catch {
                     if error == .cancelled { return }
                     await loop.run { channel.readFailed(nioError(error)) }
                     return
                 }
-                guard n > 0 else {
+                guard !received.isEmpty else {
                     await loop.run { channel.didRead(nil) }
                     return
                 }
-                var bytes = channel.allocator.buffer(capacity: n)
-                buffer.withUnsafeBytes { _ = bytes.writeBytes($0) }
+                var bytes = channel.allocator.buffer(capacity: received.count)
+                received.withUnsafeBytes { _ = bytes.writeBytes($0) }
+                _ = consume received
                 await loop.run { [bytes] in channel.didRead(bytes) }
             }
         }
         readerTask.withLockedValue { $0 = reader }
     }
 
-    private func startWriter(channel: VegaSocketChannel) {
-        let loop = self.loop, out = self.out
+    /// Start the writer `claimWriter` claimed. It sends what the flushes
+    /// left, and ends once nothing is left: a connection whose writes all go
+    /// at once (`send`) never has one waiting.
+    private func startWriter() {
+        let loop = self.loop, out = self.out, channel = self.channel
         let writer = loop.runtime.spawn { [self] in
             var parts = UnsafeMutableBufferPointer<UnsafeRawBufferPointer>.allocate(capacity: 16)
             defer { parts.deallocate() }
+            var wrote = false
             while true {
-                // The half is ours (`writing`) from here until doneWriting.
-                let (batch, shutdown) = await waitToWrite()
+                // The half is ours (`writing`) from here until the next
+                // takeWrites; none left ends the writer.
+                guard let (batch, shutdown) = takeWrites(after: wrote) else { return }
+                wrote = true
                 if !batch.isEmpty {
                     if parts.count < batch.count {
                         parts.deallocate()
@@ -772,7 +801,6 @@ final class StreamIO<Source: ByteSource & ~Copyable, Sink: ByteSink & ~Copyable>
                     out.half = nil
                     return
                 }
-                doneWriting()
             }
         }
         writerTask.withLockedValue { $0 = writer }
@@ -798,34 +826,24 @@ final class StreamIO<Source: ByteSource & ~Copyable, Sink: ByteSink & ~Copyable>
         }
     }
 
-    /// Wait for writes to send, and take the half: an empty batch without
-    /// `shutdown` once closed with nothing left to send.
-    private func waitToWrite() async -> (batch: [ByteBuffer], shutdown: Bool) {
-        while true {
-            let taken = shared.withLockedValue { s -> (batch: [ByteBuffer], shutdown: Bool)? in
-                guard s.writerReady else { return nil }
-                s.writing = true
-                let batch = s.writes
-                s.writes.removeAll(keepingCapacity: true)
-                let shutdown = s.shutdownOutput && !s.closed
-                if shutdown { s.shutdownOutput = false }
-                return (batch, shutdown)
+    /// The writer's next batch, taking the half: an empty batch without
+    /// `shutdown` once closed with nothing left to send. Nil when there is
+    /// nothing to do, and the writer ends: under the same lock, so whoever
+    /// next has something for it sees no writer running and starts one.
+    /// `wrote`: the writer had the half, from its last batch, until now.
+    private func takeWrites(after wrote: Bool) -> (batch: [ByteBuffer], shutdown: Bool)? {
+        shared.withLockedValue { s in
+            if wrote { s.writing = false }
+            guard s.writerReady else {
+                s.writerRunning = false
+                return nil
             }
-            if let taken { return taken }
-            await parkWriter()
-        }
-    }
-
-    // Not inlined: see waitToRead.
-    @inline(never)
-    private func parkWriter() async {
-        await withUnsafeContinuation { (c: UnsafeContinuation<Void, Never>) in
-            let ready = shared.withLockedValue { s -> Bool in
-                if s.writerReady { return true }
-                s.writer = c
-                return false
-            }
-            if ready { c.resume() }
+            s.writing = true
+            let batch = s.writes
+            s.writes.removeAll(keepingCapacity: true)
+            let shutdown = s.shutdownOutput && !s.closed
+            if shutdown { s.shutdownOutput = false }
+            return (batch, shutdown)
         }
     }
 
@@ -854,10 +872,11 @@ final class StreamIO<Source: ByteSource & ~Copyable, Sink: ByteSink & ~Copyable>
             return true
         }
         guard mine else {
-            shared.withLockedValue { s in
+            let start = shared.withLockedValue { s in
                 s.writes.append(contentsOf: buffers)
-                return s.takeWriter()
-            }?.resume()
+                return claimWriter(&s)
+            }
+            if start { startWriter() }
             return 0
         }
         let sent: Int
@@ -886,20 +905,22 @@ final class StreamIO<Source: ByteSource & ~Copyable, Sink: ByteSink & ~Copyable>
             rest.append(first)
             rest.append(contentsOf: buffers[(whole + 1)...])
         }
-        shared.withLockedValue { s -> UnsafeContinuation<Void, Never>? in
+        let start = shared.withLockedValue { s -> Bool in
             s.writing = false
-            guard !rest.isEmpty else { return nil }
+            guard !rest.isEmpty else { return false }
             s.writes.insert(contentsOf: rest, at: 0)
-            return s.takeWriter()
-        }?.resume()
+            return claimWriter(&s)
+        }
+        if start { startWriter() }
         return whole
     }
 
     func shutdownOutput() {
-        shared.withLockedValue { s in
+        let start = shared.withLockedValue { s in
             s.shutdownOutput = true
-            return s.takeWriter()
-        }?.resume()
+            return claimWriter(&s)
+        }
+        if start { startWriter() }
     }
 
     /// Stop reading for good: the reader task ends, and drops a pipe's read
@@ -916,14 +937,16 @@ final class StreamIO<Source: ByteSource & ~Copyable, Sink: ByteSink & ~Copyable>
 
     /// Stop reading now; let the writer send what it has, for up to `linger`.
     func close(linger: Duration, runtime: Runtime) {
-        let (r, w, pending) = shared.withLockedValue {
-            s -> (UnsafeContinuation<Bool, Never>?, UnsafeContinuation<Void, Never>?, Bool) in
+        // With no writer running, one starts to drop the write half; one
+        // that is running sees `closed` once it has sent what it has.
+        let (r, start, pending) = shared.withLockedValue {
+            s -> (UnsafeContinuation<Bool, Never>?, Bool, Bool) in
             s.closed = true
             defer { s.reader = nil }
-            return (s.reader, s.takeWriter(), s.writing || !s.writes.isEmpty)
+            return (s.reader, claimWriter(&s), s.writing || !s.writes.isEmpty)
         }
         r?.resume(returning: false)
-        w?.resume()
+        if start { startWriter() }
         readerTask.withLockedValue { $0?.cancel() }
         let writer = writerTask.withLockedValue { $0 }
         guard let writer, pending else { return }
